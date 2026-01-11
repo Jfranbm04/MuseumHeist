@@ -1,166 +1,68 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
 public class NPC_Behaviour : MonoBehaviour
 {
+    public enum State { Patrolling, Chasing }
+    public State currentState;
 
-    [SerializeField] private Vector3 destination;
-    [SerializeField] private Vector3 min, max;
-    [SerializeField] private GameObject player;
+    [Header("Configuración")]
+    public Transform pathParent;
+    public Transform player;
+    public float sightRange = 5f; // Distancia para empezar a seguirte
+    public float stopChaseRange = 5f; // Distancia para dejar de seguirte
 
-    [SerializeField] private int childrenIndex;
-    [SerializeField] private Transform path;
+    private List<Transform> waypoints = new List<Transform>();
+    private int currentWaypointIndex = 0;
+    private NavMeshAgent agent;
 
-    [SerializeField] private float playerDetectionDistance;
-    [SerializeField] private bool playerDetected;
-
-    private Coroutine runningPatroll;
-
-
-    public void Start()
+    void Start()
     {
-        //destination = RandomDestination();
-        //GetComponent<NavMeshAgent>().SetDestination(destination);
+        agent = GetComponent<NavMeshAgent>();
 
-        //StartCoroutine("Follow");
+        // Cargar puntos de ruta
+        foreach (Transform child in pathParent) waypoints.Add(child);
 
-        runningPatroll = StartCoroutine("Patroll");
-        //StartCoroutine("DistanceDetection");
-        
+        currentState = State.Patrolling;
+        MoveToNextWaypoint();
     }
 
-    public void Update()
+    void Update()
     {
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
 
-        //if (playerDetected)
-        //{
-        //    StopCoroutine("Patroll");
-        //    runningPatroll = null;
-        //}
-        //else if (runningPatroll == null)
-        //{
-            
-        //    StartCoroutine("Patroll");
-            
-        //}
-
-    }
-
-
-    private Vector3 RandomDestination()
-    {
-        return new Vector3(Random.Range(min.x, max.x), 0, Random.Range(min.z, max.z));
-    }
-
-
-    #region Always Detect
-
-    IEnumerator Follow()
-    {
-        while (true)
+        if (currentState == State.Patrolling)
         {
-            destination = player.transform.position;
-            GetComponent<NavMeshAgent>().SetDestination(destination);
-            yield return new WaitForEndOfFrame();
-            yield return new WaitForSeconds(1);
-        }
-    }
+            // Lógica de patrulla
+            if (!agent.pathPending && agent.remainingDistance < 0.5f)
+                MoveToNextWaypoint();
 
-    #endregion
-
-    #region Patroll Movement
-
-    IEnumerator Patroll()
-    {
-        destination = path.GetChild(childrenIndex).position;
-        GetComponent<NavMeshAgent>().SetDestination(destination);
-        
-        while (true)
-        {
-            
-            if(Vector3.Distance(transform.position, destination) < 0.5f)
+            // Si el jugador entra en rango, perseguir
+            if (distanceToPlayer < sightRange)
             {
-
-                childrenIndex++;
-                childrenIndex = childrenIndex % path.childCount;
-
-                destination = path.GetChild(childrenIndex).position;
-                GetComponent<NavMeshAgent>().SetDestination(destination);
-                
+                currentState = State.Chasing;
             }
-            yield return new WaitForSeconds(1);
         }
-    }
-
-
-
-    #endregion
-
-
-    #region Distance Detection
-
-    IEnumerator DistanceDetection()
-    {
-        while (true)
+        else if (currentState == State.Chasing)
         {
-            if (Vector3.Distance(transform.position, player.transform.position) < playerDetectionDistance)
-            {
-                if (runningPatroll != null)
-                {
-                    StopCoroutine("Patroll");
-                    runningPatroll = null;
-                }
-                playerDetected = true;
-                destination = player.transform.position;
-                GetComponent<NavMeshAgent>().SetDestination(destination);
-            }
-            else
-            {
-                playerDetected = false;
-                if(runningPatroll == null)
-                    runningPatroll = StartCoroutine("Patroll");
-            }
+            // Perseguir al jugador
+            agent.SetDestination(player.position);
 
-            yield return new WaitForSeconds(1);
+            // Si el jugador se aleja demasiado, volver a patrullar
+            if (distanceToPlayer > stopChaseRange)
+            {
+                currentState = State.Patrolling;
+                MoveToNextWaypoint();
+            }
         }
     }
 
-    #endregion
-
-
-    #region Collider Detection
-
-    private void OnTriggerEnter(Collider other)
+    void MoveToNextWaypoint()
     {
-        if (other.gameObject.CompareTag("Player"))
-        {
-            if (runningPatroll != null)
-            {
-                StopCoroutine("Patroll");
-                runningPatroll = null;
-            }
-            playerDetected = true;
-            StartCoroutine("Follow");
-        }
-       
+        if (waypoints.Count == 0) return;
+        agent.SetDestination(waypoints[currentWaypointIndex].position);
+        currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
     }
-
-
-    private void OnTriggerExit(Collider other)
-    {
-        if (other.gameObject.CompareTag("Player"))
-        {
-            StopCoroutine("Follow");
-            playerDetected = false;
-            if (runningPatroll == null)
-                runningPatroll = StartCoroutine("Patroll");
-        }
-
-    }
-
-    #endregion
-
 }
-
-

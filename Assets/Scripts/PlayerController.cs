@@ -3,26 +3,39 @@ using UnityEngine.AI;
 
 public class PlayerController : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    private NavMeshAgent agent;
+    private Camera cam;
+
     void Start()
     {
-        
+        agent = GetComponent<NavMeshAgent>();
+        cam = Camera.main;
     }
 
-    // Update is called once per frame
-    public void Update()
+    void Update()
     {
+        // Movimiento con Click
         if (Input.GetButtonDown("Fire1"))
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit = new RaycastHit();
+            Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
 
             if (Physics.Raycast(ray, out hit, 1000))
             {
-                GetComponent<NavMeshAgent>().SetDestination(hit.point);
+                agent.SetDestination(hit.point);
             }
         }
-
-      
     }
- }
+
+    // Recoger objetos al chocar
+    private void OnTriggerEnter(Collider other)
+    {
+        // Asegúrate de poner el Tag "Jewel" a tus joyas
+        if (other.CompareTag("Jewel"))
+        {
+            Debug.Log("¡Joya robada: " + other.name + "!");
+            Destroy(other.gameObject); // Elimina el objeto de la escena
+            // Aquí podrías sumar puntos a un ScoreManager
+        }
+    }
+}
