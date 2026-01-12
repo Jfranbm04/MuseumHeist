@@ -34,13 +34,12 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("Jewel"))
         {
-            Debug.Log("¡Joya robada: " + other.name + "!");
 
-            if (GameManager.instance != null)
-            {
+            //if (GameManager.instance != null)
+            //{
+            //}
+
                 GameManager.instance.CollectGem();
-            }
-
             Destroy(other.gameObject); 
         }
     }

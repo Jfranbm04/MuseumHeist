@@ -8,11 +8,10 @@ public class NPC_Behaviour : MonoBehaviour
     public enum State { Patrolling, Chasing }
     public State currentState;
 
-
     [Header("Configuración de Visión")]
-    public float sightRange = 10f;       // Distancia máxima
-    public float fieldOfViewAngle = 90f; // Cono de visión (90 grados delante)
-    public LayerMask obstacleLayer;     // Capa "Obstacle"
+    public float sightRange = 10f;
+    public float fieldOfViewAngle = 90f;
+    public LayerMask obstacleLayer;
 
     [Header("Configuración de Ruta")]
     public Transform pathParent;
@@ -21,16 +20,22 @@ public class NPC_Behaviour : MonoBehaviour
     public float stopChaseRange = 15f;
 
     private List<Transform> waypoints = new List<Transform>();
-    private int currentWaypointIndex = 0;
+    private List<int> pendingIndices = new List<int>(); // Lista de índices que faltan por visitar
     private NavMeshAgent agent;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         agent.speed = guardSpeed;
+
+        // Llenamos la lista original de waypoints
         foreach (Transform child in pathParent) waypoints.Add(child);
+
         currentState = State.Patrolling;
-        MoveToNextWaypoint();
+
+        // Iniciamos la primera patrulla aleatoria
+        ResetPendingIndices();
+        MoveToNextRandomWaypoint();
     }
 
     void Update()
@@ -49,52 +54,62 @@ public class NPC_Behaviour : MonoBehaviour
         }
     }
 
-    bool CanSeePlayer()
+    void ResetPendingIndices()
     {
-        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
-
-        // 1. Distancia
-        if (distanceToPlayer < sightRange)
+        pendingIndices.Clear();
+        for (int i = 0; i < waypoints.Count; i++)
         {
-            Vector3 directionToPlayer = (player.position - transform.position).normalized;
-
-            // 2. Ángulo
-            if (Vector3.Angle(transform.forward, directionToPlayer) < fieldOfViewAngle / 2)
-            {
-                Vector3 startPos = transform.position + Vector3.up * 1.5f + transform.forward * 0.5f;
-                Vector3 targetPos = player.position + Vector3.up * 1.5f;
-
-                RaycastHit hit;
-
-                // Lanzamos el rayo contra TODO (sin filtro de capas por ahora para evitar errores)
-                if (Physics.Linecast(startPos, targetPos, out hit))
-                {
-                    // Si lo PRIMERO que toca el rayo es el Player...
-                    if (hit.transform.CompareTag("Player"))
-                    {
-                        Debug.DrawLine(startPos, targetPos, Color.green); // Línea VERDE: Te veo
-                        return true;
-                    }
-                    else
-                    {
-                        Debug.DrawLine(startPos, hit.point, Color.red); // Línea ROJA: Bloqueado por pared
-                        return false;
-                    }
-                }
-                else
-                {
-                    Debug.DrawLine(startPos, targetPos, Color.green);
-                    return true;
-                }
-            }
+            pendingIndices.Add(i);
         }
-        return false;
+    }
+
+    void MoveToNextRandomWaypoint()
+    {
+        if (waypoints.Count == 0) return;
+
+        // Si ya visitamos todos, reiniciamos la lista para un nuevo ciclo
+        if (pendingIndices.Count == 0)
+        {
+            ResetPendingIndices();
+        }
+
+        // Elegimos un índice al azar de los que quedan
+        int randomIndexInList = Random.Range(0, pendingIndices.Count);
+        int waypointIndex = pendingIndices[randomIndexInList];
+
+        // Le decimos al agente que vaya allí
+        agent.SetDestination(waypoints[waypointIndex].position);
+
+        // Eliminamos ese índice para no repetirlo en este ciclo
+        pendingIndices.RemoveAt(randomIndexInList);
     }
 
     void PatrolLogic()
     {
         if (!agent.pathPending && agent.remainingDistance < 0.5f)
-            MoveToNextWaypoint();
+            MoveToNextRandomWaypoint();
+    }
+
+
+    bool CanSeePlayer()
+    {
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        if (distanceToPlayer < sightRange)
+        {
+            Vector3 directionToPlayer = (player.position - transform.position).normalized;
+            if (Vector3.Angle(transform.forward, directionToPlayer) < fieldOfViewAngle / 2)
+            {
+                Vector3 startPos = transform.position + Vector3.up * 1.5f + transform.forward * 0.5f;
+                Vector3 targetPos = player.position + Vector3.up * 1.5f;
+                RaycastHit hit;
+                if (Physics.Linecast(startPos, targetPos, out hit))
+                {
+                    if (hit.transform.CompareTag("Player")) return true;
+                }
+                else return true;
+            }
+        }
+        return false;
     }
 
     void ChaseLogic()
@@ -103,24 +118,14 @@ public class NPC_Behaviour : MonoBehaviour
         if (Vector3.Distance(transform.position, player.position) > stopChaseRange)
         {
             currentState = State.Patrolling;
-            MoveToNextWaypoint();
+            MoveToNextRandomWaypoint();
         }
     }
 
-    void MoveToNextWaypoint()
-    {
-        if (waypoints.Count == 0) return;
-        agent.SetDestination(waypoints[currentWaypointIndex].position);
-        currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
-    }
-
-    // Dibujado visual para que veas el rango en el editor
     private void OnDrawGizmos()
     {
         Gizmos.color = Color.blue;
         Gizmos.DrawWireSphere(transform.position, sightRange);
-
-        // Dibuja el ángulo de visión
         Vector3 leftBoundary = Quaternion.AngleAxis(-fieldOfViewAngle / 2, Vector3.up) * transform.forward;
         Vector3 rightBoundary = Quaternion.AngleAxis(fieldOfViewAngle / 2, Vector3.up) * transform.forward;
         Gizmos.DrawRay(transform.position, leftBoundary * sightRange);
