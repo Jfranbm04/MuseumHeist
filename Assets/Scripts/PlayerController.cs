@@ -3,12 +3,14 @@ using UnityEngine.AI;
 
 public class PlayerController : MonoBehaviour
 {
+    public float playerSpeed = 5f;
     private NavMeshAgent agent;
     private Camera cam;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        agent.speed = playerSpeed;
         cam = Camera.main;
     }
 
@@ -34,8 +36,14 @@ public class PlayerController : MonoBehaviour
         if (other.CompareTag("Jewel"))
         {
             Debug.Log("¡Joya robada: " + other.name + "!");
-            Destroy(other.gameObject); // Elimina el objeto de la escena
-            // Aquí podrías sumar puntos a un ScoreManager
+
+            // Avisamos al manager que reste una gema
+            if (GameManager.instance != null)
+            {
+                GameManager.instance.CollectGem();
+            }
+
+            Destroy(other.gameObject); 
         }
     }
 }
