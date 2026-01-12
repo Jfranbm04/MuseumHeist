@@ -32,12 +32,10 @@ public class PlayerController : MonoBehaviour
     // Recoger objetos al chocar
     private void OnTriggerEnter(Collider other)
     {
-        // Asegúrate de poner el Tag "Jewel" a tus joyas
         if (other.CompareTag("Jewel"))
         {
             Debug.Log("¡Joya robada: " + other.name + "!");
 
-            // Avisamos al manager que reste una gema
             if (GameManager.instance != null)
             {
                 GameManager.instance.CollectGem();

@@ -38,10 +38,8 @@ public class NPC_Behaviour : MonoBehaviour
         if (currentState == State.Patrolling)
         {
             PatrolLogic();
-            // Comprobamos visión en cada frame
             if (CanSeePlayer())
             {
-                Debug.Log("¡TE VEO!"); // Mensaje en consola para confirmar
                 currentState = State.Chasing;
             }
         }
@@ -60,12 +58,9 @@ public class NPC_Behaviour : MonoBehaviour
         {
             Vector3 directionToPlayer = (player.position - transform.position).normalized;
 
-            // 2. Ángulo (¿Estás delante de él?)
+            // 2. Ángulo
             if (Vector3.Angle(transform.forward, directionToPlayer) < fieldOfViewAngle / 2)
             {
-                // Definimos origen y destino del rayo (a la altura de los ojos, aprox 1.5m)
-                // IMPORTANTE: Movemos el origen un poco adelante (+ transform.forward * 0.5f) 
-                // para que el rayo no choque con el propio collider del guardia.
                 Vector3 startPos = transform.position + Vector3.up * 1.5f + transform.forward * 0.5f;
                 Vector3 targetPos = player.position + Vector3.up * 1.5f;
 
@@ -83,14 +78,11 @@ public class NPC_Behaviour : MonoBehaviour
                     else
                     {
                         Debug.DrawLine(startPos, hit.point, Color.red); // Línea ROJA: Bloqueado por pared
-                        // Opcional: saber qué bloquea la visión
-                        // Debug.Log("Visión bloqueada por: " + hit.transform.name);
                         return false;
                     }
                 }
                 else
                 {
-                    // Si no choca con nada (raro en Linecast si apuntamos al player), asumimos que te ve
                     Debug.DrawLine(startPos, targetPos, Color.green);
                     return true;
                 }
@@ -133,5 +125,13 @@ public class NPC_Behaviour : MonoBehaviour
         Vector3 rightBoundary = Quaternion.AngleAxis(fieldOfViewAngle / 2, Vector3.up) * transform.forward;
         Gizmos.DrawRay(transform.position, leftBoundary * sightRange);
         Gizmos.DrawRay(transform.position, rightBoundary * sightRange);
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            GameManager.instance.PlayerCaught();
+        }
     }
 }
